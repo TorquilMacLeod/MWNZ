@@ -1,5 +1,13 @@
 # Companies API Documentation
 
+## Deployment
+
+In order to deploy this solution into a new environment:
+* Zip the solutions/lambda folder and upload to an S3 bucket
+* Create a new CloudFormation stack using cloudformation.yml as a template
+* Enter the parameters as required
+* Once the stack has launched, navigate to the outputs and note the URL of the new API
+
 ## API Endpoint
 
 The base API endpoint is:
