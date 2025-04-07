@@ -21,7 +21,7 @@ exports.handler = async (event, ) => {
         const companyId = pathParameters.id
         
         if (!companyId) {
-            return buildResponse(400, { error: 'Missing company ID' })
+            return buildResponse(404, { error: '404', error_description: 'Missing company ID' })
         }
         
         console.log(`Retrieving information for company ID: ${companyId}`)
@@ -31,13 +31,13 @@ exports.handler = async (event, ) => {
         const companyJSONData = await parseXMLToJSON(companyXMLData)
         
         if (companyJSONData) {
-            return buildResponse(200, companyJSONData)
+            return buildResponse(200, { id: companyJSONData.Data.id, name: companyJSONData.Data.name, description: companyJSONData.Data.description })
         } else {
-            return buildResponse(404, { error: `Company with ID ${companyId} not found` })
+            return buildResponse(404, { error: '404', error_description: `Company with ID ${companyId} not found` })
         }
     } catch (error) {
         console.error('Error processing request:', error)
-        return buildResponse(500, { error: 'Internal server error', message: error.message })
+        return buildResponse(404, { error: '404', error_description: error.message })
     }
 }
 
@@ -65,7 +65,7 @@ function fetchXMLFromUrl(companyId) {
             
             // Check for error status codes
             if (response.statusCode < 200 || response.statusCode >= 300) {
-                return reject(new Error(`Failed to fetch XML, status code: ${response.statusCode}`))
+                return reject(new Error(`Failed to fetch XML from backend`))
             }
             
             // Collect data
