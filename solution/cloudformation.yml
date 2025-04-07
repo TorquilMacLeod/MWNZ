@@ -118,4 +118,4 @@ Outputs:
   
   LambdaFunctionArn:
     Description: ARN of the Lambda function
-    Value: !GetAtt CompanyLambdaFunction.Arn
+    Value: !GetAtt CompanyLambda.Arn
