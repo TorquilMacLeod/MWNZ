@@ -1,0 +1,121 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudFormation template for API Gateway with Lambda integration'
+
+Parameters:
+  S3BucketName:
+    Type: String
+    Description: Name of the S3 bucket containing the Lambda code
+  
+  S3LambdaKey:
+    Type: String
+    Description: S3 key for the Lambda function code package (ZIP file)
+
+  ApiStageName:
+    Type: String
+    Default: dev
+    Description: Name of the API Gateway stage
+
+Resources:
+  # IAM Role for Lambda function
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  # Lambda function
+  CompanyLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub ${AWS::StackName}-company-function
+      Handler: index.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Runtime: nodejs22.x
+      Timeout: 30
+      Code:
+        S3Bucket: !Ref S3BucketName
+        S3Key: !Ref S3LambdaKey
+
+  # Lambda permission to allow API Gateway to invoke the function
+  LambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref CompanyLambda
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${CompaniesApi}/*
+
+  # API Gateway REST API
+  CompaniesApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub ${AWS::StackName}-companies-api
+      Description: API for accessing company information
+
+  # API Resource for /companies
+  CompaniesResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref CompaniesApi
+      ParentId: !GetAtt CompaniesApi.RootResourceId
+      PathPart: companies
+
+  # API Resource for /companies/{id}
+  CompanyResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref CompaniesApi
+      ParentId: !Ref CompaniesResource
+      PathPart: '{id}'
+
+  # GET Method for /companies/{id}
+  CompanyGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref CompaniesApi
+      ResourceId: !Ref CompanyResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.path.id: true
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CompanyLambda.Arn}/invocations
+        IntegrationResponses:
+          - StatusCode: 200
+      MethodResponses:
+        - StatusCode: 200
+
+  # API Gateway Deployment
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - CompanyGetMethod
+    Properties:
+      RestApiId: !Ref CompaniesApi
+      Description: Deployment for Companies API
+
+  # API Gateway Stage
+  ApiStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      DeploymentId: !Ref ApiDeployment
+      RestApiId: !Ref CompaniesApi
+      StageName: !Ref ApiStageName
+
+Outputs:
+  ApiEndpoint:
+    Description: URL of the API Gateway endpoint
+    Value: !Sub https://${CompaniesApi}.execute-api.${AWS::Region}.amazonaws.com/${ApiStageName}/companies/{id}
+  
+  LambdaFunctionArn:
+    Description: ARN of the Lambda function
+    Value: !GetAtt CompanyLambdaFunction.Arn
