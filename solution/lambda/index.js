@@ -27,10 +27,11 @@ exports.handler = async (event, ) => {
         console.log(`Retrieving information for company ID: ${companyId}`)
         
         // Fetch and process XML data from backend
-        const companyData = await getCompanyXMLData(companyId)
+        const companyXMLData = await fetchXMLFromUrl(companyId)
+        const companyJSONData = await parseXMLToJSON(companyXMLData)
         
-        if (companyData) {
-            return buildResponse(200, companyData)
+        if (companyJSONData) {
+            return buildResponse(200, companyJSONData)
         } else {
             return buildResponse(404, { error: `Company with ID ${companyId} not found` })
         }
@@ -41,38 +42,21 @@ exports.handler = async (event, ) => {
 }
 
 /**
- * Fetches XML data from a URL
- * 
- * @param {string} companyId - The company's unique identifier
- * @returns {Object|null} Processed company information or null if not found
- */
-async function getCompanyXMLData(companyId) {
-    // Determine the URL for the XML data based on company ID
-    const xmlUrl = `${xmlSource}/${companyId}.xml`
-    
-    if (!companyId) {
-        console.log(`No company ID provided`)
-        return null
-    }
-    
-    try {
-        // Fetch and return the XML data
-        const xmlData = await fetchXMLFromUrl(xmlUrl)
-        return xmlData
-    } catch (error) {
-        console.error(`Error fetching or processing XML for company ${companyId}:`, error)
-        return null
-    }
-}
-
-/**
  * Fetches XML content from a URL
  * 
  * @param {string} url - The URL to fetch XML from
  * @returns {Promise<string>} The XML content as a string (promisified)
  */
-function fetchXMLFromUrl(url) {
+function fetchXMLFromUrl(companyId) {
     return new Promise((resolve, reject) => {
+        // Determine the URL for the XML data based on company ID
+        const url = `${xmlSource}/${companyId}.xml`
+        
+        if (!companyId) {
+            console.log(`No company ID provided`)
+            return reject(new Error(`No company ID provided`))
+        }
+
         const request = https.get(url, (response) => {
             // Handle redirects
             if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
@@ -116,7 +100,7 @@ function fetchXMLFromUrl(url) {
  * @param {string} xmlContent - XML content as string
  * @returns {Object} Parsed JSON object
  */
-function parseXMLToJson(xmlContent) {
+function parseXMLToJSON(xmlContent) {
     // Configure parser options
     const options = {
         ignoreAttributes: false,
